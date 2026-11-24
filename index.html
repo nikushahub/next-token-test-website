@@ -117,7 +117,14 @@
     <!-- Header -->
     <header class="absolute inset-x-0 top-0 z-10 flex items-center justify-between pl-[46px] pr-[57px] pt-[48px] max-md:px-6 max-md:pt-8">
       <a href="#" class="hit flex items-center gap-[8px]" aria-label="Next Token, home">
-        <svg viewBox="0 0 246 246" class="h-[19px] w-[19px]" aria-hidden="true">
+        <svg viewBox="0 0 246 246" class="h-[19px] w-[19px] overflow-visible" aria-hidden="true">
+          <!-- Soft glow: each square glows in its own color -->
+          <filter id="logo-glow" x="-60%" y="-60%" width="220%" height="220%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="44" result="blur"/>
+            <feComponentTransfer in="blur" result="halo"><feFuncA type="linear" slope=".85"/></feComponentTransfer>
+            <feMerge><feMergeNode in="halo"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <g filter="url(#logo-glow)">
           <g fill="#6CB4F7">
             <rect x="0" y="0" width="54" height="54" rx="9"/>
             <rect x="0" y="64" width="54" height="54" rx="9"/><rect x="64" y="64" width="54" height="54" rx="9"/>
@@ -125,8 +132,9 @@
             <rect x="0" y="192" width="54" height="54" rx="9"/><rect x="64" y="192" width="54" height="54" rx="9"/><rect x="128" y="192" width="54" height="54" rx="9"/>
           </g>
           <rect x="192" y="192" width="54" height="54" rx="9" fill="#F0B323"/>
+          </g>
         </svg>
-        <span class="display text-[23px] leading-none text-azure">Next Token</span>
+        <span class="display text-[23px] leading-none text-azure [text-shadow:0_0_14px_rgba(108,180,247,.6),0_0_3px_rgba(108,180,247,.45)]">Next Token</span>
       </a>
       <nav class="flex items-center" aria-label="Main">
         <a href="#" class="hit text-[16px] font-semibold leading-[22px] max-md:hidden">Archive</a>
