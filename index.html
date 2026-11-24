@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Next Token</title>
+  <meta name="description" content="Next Token: AI news, one token at a time. Plain summaries of the week in AI, picked by the community.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2310302E'/%3E%3Cg fill='%23ECEFE8'%3E%3Crect x='7' y='7' width='4' height='4' rx='1'/%3E%3Crect x='7' y='12' width='4' height='4' rx='1'/%3E%3Crect x='12' y='12' width='4' height='4' rx='1'/%3E%3Crect x='7' y='17' width='4' height='4' rx='1'/%3E%3Crect x='12' y='17' width='4' height='4' rx='1'/%3E%3Crect x='17' y='17' width='4' height='4' rx='1'/%3E%3Crect x='7' y='22' width='4' height='4' rx='1'/%3E%3Crect x='12' y='22' width='4' height='4' rx='1'/%3E%3Crect x='17' y='22' width='4' height='4' rx='1'/%3E%3C/g%3E%3Crect x='22' y='22' width='4' height='4' rx='1' fill='%23F0B323'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=Instrument+Sans:wght@400;600&display=swap">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            spruce: "#10302E", // primary ink and dark surfaces
+            fog: "#ECEFE8",    // page background / text on dark
+            pine: "#24504B",   // secondary text, hover states
+            lichen: "#A9BDB0", // borders, muted detail
+            saffron: "#F0B323" // the one thing that comes next
+          },
+          fontFamily: {
+            display: ['"Bricolage Grotesque"', "ui-sans-serif", "system-ui", "sans-serif"],
+            sans: ['"Instrument Sans"', "ui-sans-serif", "system-ui", "sans-serif"],
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    :root {
+      --spruce: #10302E; --fog: #ECEFE8; --pine: #24504B; --lichen: #A9BDB0; --saffron: #F0B323;
+      --spring: cubic-bezier(.34,1.56,.64,1);
+      --slide: cubic-bezier(.77,0,.18,1);
+      /* the mask's modular rhythm: one cell plus its gutter */
+      --cell: 32px; --gutter: 8px;
+    }
+    *, :after, :before { box-sizing: inherit; margin: 0; padding: 0; }
+    html { line-height: 1.15; -webkit-text-size-adjust: 100%; box-sizing: border-box; }
+    body, html { font-size: 16px; background: var(--spruce); color: var(--fog); overflow: hidden; cursor: none; }
+    body { margin: 0; font-family: "Instrument Sans", ui-sans-serif, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+    a, button { cursor: none; color: inherit; background: none; border: 0; font: inherit; }
+    @media (pointer: coarse) { body, html, a, button { cursor: auto; } #cursor { display: none; } }
+
+    .hit { transition: opacity .25s ease, transform .35s var(--spring); }
+    .hit:hover { opacity: .6; }
+    .hit:active { transform: scale(.92); }
+    .hit:focus-visible { outline: 2px solid var(--fog); outline-offset: 5px; border-radius: 3px; }
+
+    .display { font-family: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif; font-weight: 700; letter-spacing: -0.03em; }
+
+    .title { font-size: 104px; line-height: 1; white-space: nowrap; transition: opacity .9s var(--slide); }
+    .title:not(.is-current) { opacity: .28; }
+    .title:not(.is-current):hover { opacity: .5; }
+    .title:focus-visible { outline: 2px solid var(--fog); outline-offset: 8px; border-radius: 4px; }
+    #track { transition: transform 1.1s var(--slide); will-change: transform; }
+    .swap { transition: opacity .35s ease, transform .5s cubic-bezier(.22,1,.36,1); }
+    .swap.out { opacity: 0; transform: translateY(6px); }
+
+    /* Causal mask: each cell is three stacked layers; only opacity and transform animate */
+    #mask { display: grid; grid-template-columns: repeat(6, var(--cell)); gap: var(--gutter); }
+    .cell { position: relative; width: var(--cell); height: var(--cell); }
+    .cell > i { position: absolute; inset: 0; border-radius: calc(var(--cell) * .2); opacity: 0;
+                transition: opacity .5s ease, transform .6s var(--spring); transition-delay: var(--d, 0ms); }
+    .cell .msk { border: 1.5px dashed rgba(169,189,176,.32); }
+    .cell .ctx { background: rgba(169,189,176,.26); transform: scale(.6); }
+    .cell .nxt { background: var(--saffron); transform: scale(.4); box-shadow: 0 0 0 1px rgba(240,179,35,.25), 0 8px 24px -6px rgba(240,179,35,.45), 0 2px 6px rgba(16,48,46,.6); }
+    .cell[data-s="masked"] .msk { opacity: 1; }
+    .cell[data-s="context"] .ctx, .cell[data-s="next"] .nxt { opacity: 1; transform: none; }
+
+    /* Shader layer: fades in once mounted, feathered so it lives behind the headline band */
+    #mesh { opacity: 0; transition: opacity 1.6s ease;
+            -webkit-mask-image: radial-gradient(ellipse 75% 50% at 38% 54%, #000 30%, transparent 100%);
+                    mask-image: radial-gradient(ellipse 75% 50% at 38% 54%, #000 30%, transparent 100%); }
+    #mesh.on { opacity: .8; }
+    #mesh canvas { display: block; }
+    @media (max-width: 767px) {
+      #mesh { -webkit-mask-image: radial-gradient(ellipse 120% 45% at 40% 52%, #000 30%, transparent 100%);
+                      mask-image: radial-gradient(ellipse 120% 45% at 40% 52%, #000 30%, transparent 100%); }
+    }
+
+    #cursor { position: fixed; left: 0; top: 0; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%;
+              background: var(--fog); pointer-events: none; z-index: 100; opacity: 0; mix-blend-mode: difference;
+              transition: opacity .2s ease, width .3s var(--spring), height .3s var(--spring), margin .3s var(--spring); }
+    #cursor.big { width: 36px; height: 36px; margin: -18px 0 0 -18px; }
+
+    @media (max-width: 767px) {
+      .title { font-size: 52px; line-height: 1.02; white-space: normal; width: calc(100vw - 48px); flex: none; text-align: left; }
+      :root { --cell: 18px; --gutter: 5px; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, :after, :before { transition-duration: .01ms !important; transition-delay: 0ms !important; } }
+  </style>
+</head>
+<body>
+  <main class="relative h-screen w-screen select-none">
+    <!-- Ground: spruce surface, layered radial light, grain -->
+    <div class="absolute inset-0" aria-hidden="true">
+      <!-- Static glow: shows until the shader is ready, and stays if WebGL is unavailable -->
+      <div class="absolute inset-0 bg-[radial-gradient(ellipse_60%_55%_at_40%_50%,rgba(36,80,75,.45),transparent_70%),radial-gradient(ellipse_70%_60%_at_8%_100%,rgba(36,80,75,.35),transparent_65%)]"></div>
+      <!-- Mesh gradient shader, concentrated behind the hero headline -->
+      <div id="mesh" class="absolute inset-0"></div>
+      <div class="absolute inset-0 bg-[radial-gradient(ellipse_90%_80%_at_50%_50%,transparent_40%,rgba(6,22,21,.55))]"></div>
+      <svg class="absolute inset-0 h-full w-full opacity-[.07] mix-blend-overlay">
+        <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="3" stitchTiles="stitch"/><feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0"/></filter>
+        <rect width="100%" height="100%" filter="url(#grain)"/>
+      </svg>
+    </div>
+
+    <!-- Brand pattern: the mask fills in one story at a time -->
+    <div class="absolute right-[57px] top-[132px] z-0 max-md:right-6 max-md:top-[96px]" aria-hidden="true">
+      <div id="mask"></div>
+    </div>
+
+    <!-- Header -->
+    <header class="absolute inset-x-0 top-0 z-10 flex items-center justify-between pl-[46px] pr-[57px] pt-[48px] max-md:px-6 max-md:pt-8">
+      <a href="#" class="hit flex items-center gap-[8px]" aria-label="Next Token, home">
+        <svg viewBox="0 0 246 246" class="h-[19px] w-[19px]" aria-hidden="true">
+          <g fill="#ECEFE8">
+            <rect x="0" y="0" width="54" height="54" rx="9"/>
+            <rect x="0" y="64" width="54" height="54" rx="9"/><rect x="64" y="64" width="54" height="54" rx="9"/>
+            <rect x="0" y="128" width="54" height="54" rx="9"/><rect x="64" y="128" width="54" height="54" rx="9"/><rect x="128" y="128" width="54" height="54" rx="9"/>
+            <rect x="0" y="192" width="54" height="54" rx="9"/><rect x="64" y="192" width="54" height="54" rx="9"/><rect x="128" y="192" width="54" height="54" rx="9"/>
+          </g>
+          <rect x="192" y="192" width="54" height="54" rx="9" fill="#F0B323"/>
+        </svg>
+        <span class="display text-[23px] leading-none">Next Token</span>
+      </a>
+      <nav class="flex items-center" aria-label="Main">
+        <a href="#" class="hit text-[16px] font-semibold leading-[22px] max-md:hidden">Archive</a>
+        <a href="#" class="hit ml-[40px] text-[16px] font-semibold leading-[22px] max-md:ml-0">Submit a story</a>
+        <ul class="relative ml-[48px] flex items-center gap-[20px] max-md:hidden" aria-label="Follow Next Token">
+          <li><a href="#" class="hit block" aria-label="Discord"><svg viewBox="0 0 24 24" class="h-[22px] w-[22px]" fill="currentColor"><path d="M19.3 5.6A16.6 16.6 0 0 0 15.2 4.3l-.5 1a15.4 15.4 0 0 0-5.4 0l-.5-1a16.6 16.6 0 0 0-4.1 1.3C2.1 9.5 1.4 13.3 1.7 17a16.8 16.8 0 0 0 5.1 2.6l1.1-1.7a10.8 10.8 0 0 1-1.7-.8l.4-.3a11.9 11.9 0 0 0 10.8 0l.4.3a10.8 10.8 0 0 1-1.7.8l1.1 1.7a16.8 16.8 0 0 0 5.1-2.6c.4-4.3-.7-8-3-11.4ZM8.6 14.8c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Zm6.8 0c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Z"/></svg></a></li>
+          <li><a href="#" class="hit block" aria-label="X"><svg viewBox="0 0 24 24" class="h-[19px] w-[19px]" fill="currentColor"><path d="M17.8 3h3.1l-6.8 7.7L22 21h-6.2l-4.9-6.3L5.3 21H2.2l7.2-8.3L1.8 3h6.4l4.4 5.8Zm-1.1 16.2h1.7L7.4 4.7H5.6Z"/></svg></a></li>
+          <li><a href="#" class="hit block" aria-label="YouTube"><svg viewBox="0 0 24 24" class="h-[22px] w-[22px]" fill="currentColor"><path d="M22.5 7.2a2.8 2.8 0 0 0-2-2C18.8 4.8 12 4.8 12 4.8s-6.8 0-8.5.4a2.8 2.8 0 0 0-2 2A29 29 0 0 0 1.1 12a29 29 0 0 0 .4 4.8 2.8 2.8 0 0 0 2 2c1.7.4 8.5.4 8.5.4s6.8 0 8.5-.4a2.8 2.8 0 0 0 2-2 29 29 0 0 0 .4-4.8 29 29 0 0 0-.4-4.8ZM9.8 15V9l5.7 3Z"/></svg></a></li>
+          <li><a href="#" class="hit block" aria-label="RSS feed"><svg viewBox="0 0 24 24" class="h-[19px] w-[19px]" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1.4" fill="currentColor" stroke="none"/></svg></a></li>
+        </ul>
+      </nav>
+    </header>
+
+    <!-- This week's stories (horizontal slider) -->
+    <section class="absolute inset-x-0 top-[44.05%] z-10" aria-roledescription="carousel" aria-label="This week's stories">
+      <div id="track" class="flex items-end gap-[240px] pl-[91px] max-md:gap-[100px] max-md:pl-6"></div>
+      <p class="mt-[34px] flex flex-wrap items-baseline gap-x-[24px] gap-y-2 pl-[91px] pr-6 max-md:pl-6">
+        <a href="#" class="hit inline-block text-[19px] font-semibold leading-[24px]">Read the summary</a>
+        <span id="byline" class="swap text-[15px] leading-[22px] text-lichen"></span>
+      </p>
+    </section>
+
+    <!-- Bottom: issue / story -->
+    <footer class="absolute bottom-0 left-0 right-0 z-10 flex items-end justify-between pb-[54px] pl-[46px] pr-[57px] max-md:px-6 max-md:pb-8">
+      <dl class="flex items-center text-[17px] leading-[22px] max-md:flex-col max-md:items-start max-md:gap-1">
+        <div class="flex items-center gap-[14px]"><dt class="text-lichen">Issue</dt><dd class="font-semibold">47, week of 23 November</dd></div>
+        <div class="ml-[46px] flex items-center gap-[14px] max-md:ml-0"><dt class="text-lichen">Story</dt><dd id="bottom-name" class="swap font-semibold"></dd></div>
+      </dl>
+      <div class="relative h-[30px] w-[50px]" aria-live="polite">
+        <span id="count-current" class="swap display absolute left-0 top-[4px] text-[17px] leading-none"></span>
+        <span class="absolute left-[21px] top-[10px] h-[24px] w-px origin-center rotate-[22deg] bg-lichen/70" aria-hidden="true"></span>
+        <span id="count-total" class="display absolute right-0 top-[16px] text-[21px] leading-none text-lichen"></span>
+      </div>
+    </footer>
+  </main>
+
+  <div id="cursor" aria-hidden="true"></div>
+
+  <!-- Mesh gradient from Paper Shaders (the same engine behind @paper-design/shaders-react), in brand colors -->
+  <script type="module">
+    import { ShaderMount, meshGradientFragmentShader, getShaderColorFromString, ShaderFitOptions }
+      from "https://cdn.jsdelivr.net/npm/@paper-design/shaders@0.0.82/+esm";
+
+    const el = document.getElementById("mesh");
+    const colors = ["#10302E", "#24504B", "#10302E", "#A9BDB0", "#24504B"]; // spruce, pine, lichen
+    const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    try {
+      new ShaderMount(el, meshGradientFragmentShader, {
+        u_colors: colors.map(getShaderColorFromString),
+        u_colorsCount: colors.length,
+        u_distortion: 0.8, u_swirl: 0.1, u_grainMixer: 0, u_grainOverlay: 0,
+        u_fit: ShaderFitOptions.cover, u_rotation: 0, u_scale: 1,
+        u_offsetX: 0, u_offsetY: 0, u_originX: 0.5, u_originY: 0.5, u_worldWidth: 0, u_worldHeight: 0,
+      }, undefined, still ? 0 : 0.3, 4200);
+      requestAnimationFrame(() => el.classList.add("on"));
+    } catch (err) {
+      console.warn("Mesh gradient unavailable, keeping the static background.", err);
+    }
+  </script>
+
+  <script>
+    const stories = [
+      { t: "Open weights", by: "Posted by ilse_k, 2 hours ago" },
+      { t: "Benchmarks, explained", by: "Posted by marco.dev, 5 hours ago" },
+      { t: "Small models, big week", by: "Posted by rowan, yesterday" },
+      { t: "Agents at work", by: "Posted by the community, 2 hours ago" },
+      { t: "Longer context", by: "Posted by tamsin_r, 2 days ago" },
+      { t: "Community picks", by: "Chosen by 1,284 readers this week" },
+    ];
+    let index = 3;
+    const N = stories.length;
+
+    // Build the causal mask grid (N x N)
+    const maskEl = document.getElementById("mask");
+    maskEl.innerHTML = Array.from({ length: N * N }, () =>
+      `<div class="cell" data-s="masked"><i class="msk"></i><i class="ctx"></i><i class="nxt"></i></div>`).join("");
+    const cells = [...maskEl.children];
+    function paintMask(i, stagger = false) {
+      cells.forEach((cell, k) => {
+        const r = Math.floor(k / N), c = k % N;
+        let s = "masked";
+        if (c <= r && (r < i || (r === i && c < i))) s = "context";
+        if (r === i && c === i) s = "next";
+        cell.style.setProperty("--d", stagger && s !== "masked" ? `${120 + k * 22}ms` : "0ms");
+        cell.dataset.s = s;
+      });
+    }
+
+    const trackEl = document.getElementById("track");
+    trackEl.innerHTML = stories.map((s, i) =>
+      `<button type="button" class="title display" data-i="${i}" aria-label="Show ${s.t}">${s.t}</button>`).join("");
+    const titles = [...trackEl.children];
+
+    const set = (id, text) => {
+      const el = document.getElementById(id);
+      el.classList.add("out");
+      setTimeout(() => { el.textContent = text; el.classList.remove("out"); }, 260);
+    };
+
+    function go(i, animate = true) {
+      index = (i + N) % N;
+      if (!animate) trackEl.style.transition = "none";
+      trackEl.style.transform = `translateX(${-(titles[index].offsetLeft - titles[0].offsetLeft)}px)`;
+      if (!animate) { trackEl.offsetWidth; trackEl.style.transition = ""; }
+      titles.forEach((t, n) => {
+        t.classList.toggle("is-current", n === index);
+        t.setAttribute("aria-current", n === index ? "true" : "false");
+        t.tabIndex = n === index ? -1 : 0;
+      });
+      const s = stories[index];
+      if (animate) {
+        set("byline", s.by); set("bottom-name", s.t); set("count-current", String(index + 1));
+        paintMask(index);
+      } else {
+        document.getElementById("byline").textContent = s.by;
+        document.getElementById("bottom-name").textContent = s.t;
+        document.getElementById("count-current").textContent = String(index + 1);
+      }
+    }
+    document.getElementById("count-total").textContent = String(N);
+
+    trackEl.addEventListener("click", (e) => {
+      const b = e.target.closest(".title");
+      if (b) go(Number(b.dataset.i));
+    });
+    let lock = false;
+    addEventListener("wheel", (e) => {
+      if (lock || Math.abs(e.deltaY) < 8) return;
+      lock = true; go(index + (e.deltaY > 0 ? 1 : -1));
+      setTimeout(() => (lock = false), 1000);
+    }, { passive: true });
+    addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") go(index + 1);
+      if (e.key === "ArrowLeft" || e.key === "ArrowUp") go(index - 1);
+    });
+    let touchX = null;
+    addEventListener("touchstart", (e) => (touchX = e.touches[0].clientX), { passive: true });
+    addEventListener("touchend", (e) => {
+      if (touchX === null) return;
+      const dx = e.changedTouches[0].clientX - touchX;
+      if (Math.abs(dx) > 40) go(index + (dx < 0 ? 1 : -1));
+      touchX = null;
+    });
+
+    // Custom cursor
+    const cursor = document.getElementById("cursor");
+    addEventListener("mousemove", (e) => {
+      cursor.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
+      cursor.style.opacity = "1";
+      cursor.classList.toggle("big", !!e.target.closest("a, button"));
+    });
+    document.addEventListener("mouseleave", () => (cursor.style.opacity = "0"));
+
+    // One orchestrated load moment: the mask fills in, token by token
+    document.fonts.ready.then(() => {
+      go(index, false);
+      requestAnimationFrame(() => paintMask(index, true));
+    });
+    addEventListener("resize", () => go(index, false));
+  </script>
+</body>
+</html>
